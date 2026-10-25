@@ -1,0 +1,275 @@
+/* ================================
+   MINI MART - PRODUCT DETAILS
+   Cute Modern Grocery Style
+================================ */
+
+.product-details-page {
+  background:
+    radial-gradient(1000px 420px at -8% -10%, #ffe3ec 0%, transparent 55%),
+    radial-gradient(800px 360px at 110% 10%, #d9f4ff 0%, transparent 50%),
+    #fff8f4;
+  min-height: 100vh;
+}
+
+
+/* ---------- Back Button ---------- */
+
+.back-products {
+  display: inline-block;
+  color: #e94f70;
+  text-decoration: none;
+  font-weight: 600;
+  margin-bottom: 25px;
+}
+
+.back-products:hover {
+  color: #d83e5e;
+}
+
+
+/* ---------- Main Card ---------- */
+
+.product-details-card {
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 28px;
+  padding: 30px;
+  box-shadow: 0 18px 40px rgba(47, 18, 28, 0.08);
+}
+
+
+/* ---------- Product Image ---------- */
+
+.details-image-box {
+  background-color: #fff5f7;
+  border-radius: 22px;
+  padding: 25px;
+  text-align: center;
+}
+
+.details-image-box img {
+  width: 100%;
+  height: 480px;
+  object-fit: cover;
+  border-radius: 18px;
+}
+
+
+/* ---------- Product Information ---------- */
+
+.details-info {
+  padding: 20px 15px;
+}
+
+.details-category {
+  display: inline-block;
+  background-color: #171717;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 15px;
+}
+
+.availability-ok {
+  color: #0f766e;
+}
+
+.availability-out {
+  color: #ed456c;
+}
+
+.details-info h1 {
+  font-size: 38px;
+  font-weight: 700;
+  color: #292929;
+  margin-bottom: 12px;
+}
+
+
+/* ---------- Rating ---------- */
+
+.details-rating {
+  color: #f2a900;
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.details-rating span {
+  color: #777;
+  font-size: 14px;
+  margin-left: 7px;
+}
+
+
+/* ---------- Description ---------- */
+
+.details-description {
+  color: #68727d;
+  font-size: 16px;
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+
+/* ---------- Price ---------- */
+
+.details-price {
+  color: #e94f70;
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.details-price span {
+  color: #777;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+
+/* ---------- Quantity ---------- */
+
+.quantity-section {
+  margin-top: 20px;
+}
+
+.quantity-section h6 {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid #e5cdd3;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.quantity-control button {
+  width: 42px;
+  height: 40px;
+  border: none;
+  background-color: #fff0f3;
+  color: #e94f70;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.quantity-control button:hover {
+  background-color: #e94f70;
+  color: white;
+}
+
+.quantity-control span {
+  width: 50px;
+  text-align: center;
+  font-weight: 600;
+}
+
+
+/* ---------- Total ---------- */
+
+.details-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 25px;
+  padding: 15px 0;
+  border-top: 1px solid #eeeeee;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.details-total span {
+  color: #555;
+  font-size: 16px;
+}
+
+.details-total strong {
+  color: #e94f70;
+  font-size: 22px;
+}
+
+
+/* ---------- Add To Cart ---------- */
+
+.details-cart-button {
+  width: 100%;
+  margin-top: 25px;
+  background: linear-gradient(135deg, #ed456c, #ff6b4a);
+  color: white;
+  border: none;
+  border-radius: 22px;
+  padding: 12px;
+  font-weight: 700;
+}
+
+.details-cart-button:hover {
+  background-color: #d83e5e;
+  color: white;
+}
+
+
+/* ---------- Product Information ---------- */
+
+.product-information {
+  background-color: #fff5f7;
+  border-radius: 18px;
+  padding: 20px;
+  margin-top: 25px;
+}
+
+.product-information h5 {
+  font-weight: 600;
+  margin-bottom: 15px;
+}
+
+.product-information p {
+  color: #68727d;
+  margin-bottom: 7px;
+}
+
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 991px) {
+
+  .details-image-box img {
+    height: 400px;
+  }
+
+  .details-info h1 {
+    font-size: 32px;
+  }
+
+}
+
+
+@media (max-width: 767px) {
+
+  .product-details-card {
+    padding: 20px;
+  }
+
+  .details-image-box img {
+    height: 300px;
+  }
+
+  .details-info {
+    padding: 25px 5px 5px;
+  }
+
+  .details-info h1 {
+    font-size: 30px;
+  }
+
+  .details-price {
+    font-size: 28px;
+  }
+
+}

@@ -1,0 +1,44 @@
+:root {
+  --mm-pink: #ed456c;
+  --mm-pink-dark: #d9365e;
+  --mm-ink: #171717;
+  --mm-muted: #667589;
+  --mm-bg: #fff8f4;
+  --mm-card: #ffffff;
+  --mm-border: #f1dde3;
+  --mm-radius: 18px;
+  --mm-shadow: 0 12px 28px rgba(47, 18, 28, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  color: var(--mm-ink);
+  background: var(--mm-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+}
+
+img {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+a {
+  color: var(--mm-pink);
+}

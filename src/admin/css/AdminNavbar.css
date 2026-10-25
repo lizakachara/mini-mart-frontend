@@ -1,0 +1,244 @@
+/* ================================
+   ADMIN NAVBAR
+================================ */
+
+.admin-navbar {
+  height: 80px;
+  background:
+    linear-gradient(180deg, rgba(18, 18, 24, 0.96), rgba(24, 16, 24, 0.94));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5%;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 40px rgba(10, 8, 16, 0.18);
+}
+
+
+/* BRAND */
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.admin-logo {
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.admin-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.admin-panel-text {
+  color: #ff8aa8;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+
+/* NAV LINKS */
+
+.admin-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-nav-link {
+  position: relative;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: 0.2s ease;
+}
+
+.admin-nav-link svg {
+  font-size: 13px;
+}
+
+.admin-nav-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-nav-link.active {
+  color: #171717;
+  background: linear-gradient(135deg, #ffd6c8, #ff8aa8);
+}
+
+.admin-nav-link.active::after {
+  display: none;
+}
+
+
+/* ADMIN PROFILE WRAPPER */
+
+.admin-profile-wrapper {
+  position: relative;
+}
+
+.admin-profile {
+  border: none;
+  background: linear-gradient(135deg, #ef476f, #ff6b4a);
+  color: white;
+  padding: 12px 18px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(239, 71, 111, 0.28);
+}
+
+.admin-profile:hover {
+  background: linear-gradient(135deg, #e63863, #f25d3d);
+}
+
+.admin-dropdown-icon {
+  font-size: 11px;
+  transition: 0.2s ease;
+}
+
+.admin-dropdown-icon.rotate {
+  transform: rotate(180deg);
+}
+
+.admin-profile-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 245px;
+  background: #16141c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  z-index: 1500;
+}
+
+.admin-dropdown-user {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+}
+
+.admin-dropdown-user > svg {
+  width: 38px;
+  height: 38px;
+  padding: 9px;
+  box-sizing: border-box;
+  background: rgba(239, 71, 111, 0.18);
+  color: #ff8aa8;
+  border-radius: 50%;
+}
+
+.admin-dropdown-user strong {
+  display: block;
+  color: #ffffff;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.admin-dropdown-user span {
+  display: block;
+  color: #9aa3b2;
+  font-size: 10px;
+}
+
+.admin-logout-button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #ff8a8a;
+  padding: 11px 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-logout-button:hover {
+  background: rgba(255, 80, 80, 0.12);
+}
+
+
+/* ================================
+   RESPONSIVE
+================================ */
+
+@media (max-width: 1100px) {
+  .admin-navbar {
+    padding: 0 4%;
+  }
+
+  .admin-nav-links {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 800px) {
+  .admin-navbar {
+    height: auto;
+    padding: 16px 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .admin-nav-links {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    overflow-x: auto;
+  }
+
+  .admin-nav-link {
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+
+  .admin-profile {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 500px) {
+  .admin-logo {
+    font-size: 22px;
+  }
+
+  .admin-panel-text {
+    font-size: 11px;
+  }
+
+  .admin-divider {
+    height: 23px;
+  }
+}
