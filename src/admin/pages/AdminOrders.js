@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
 FaSearch,
 FaShoppingCart,
@@ -40,7 +40,7 @@ return localStorage.getItem("adminToken");
 };
 
 // FETCH ORDERS FROM MONGODB
-const fetchOrders = async () => {
+const fetchOrders = useCallback(async () => {
 try {
 setLoading(true);
 setError("");
@@ -75,11 +75,10 @@ setError("");
 }
 
 
-};
-
+}, []); 
 useEffect(() => {
-fetchOrders();
-}, []);
+  fetchOrders();
+}, [fetchOrders]);
 
 // CUSTOMER NAME
 const getCustomerName = (order) => {

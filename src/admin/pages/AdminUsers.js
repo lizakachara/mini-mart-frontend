@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import {
 FaSearch,
@@ -43,7 +43,7 @@ return (user.status || "active").toLowerCase() === "active"
 };
 
 // FETCH USERS AND ORDERS FROM BACKEND
-const fetchUsers = async () => {
+const fetchUsers = useCallback(async () => {
 try {
 setLoading(true);
 setError("");
@@ -99,11 +99,11 @@ setError("");
 }
 
 
-};
+}, []);
 
 useEffect(() => {
-fetchUsers();
-}, []);
+  fetchUsers();
+}, [fetchUsers]);
 
 // GET USER'S ORDER COUNT
 const getUserOrders = (user) => {
