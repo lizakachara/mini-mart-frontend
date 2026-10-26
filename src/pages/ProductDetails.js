@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
 import "../css/ProductDetails.css";
 
-const API_URL = "http://localhost:5000/api/products";
+const API_URL = "https://mini-mart-cdkr.onrender.com/api/products";
 
 function ProductDetails() {
 const { addToCart } = useContext(CartContext);

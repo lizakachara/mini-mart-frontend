@@ -9,8 +9,8 @@ import {
 import { CartContext } from "../context/CartContext";
 import "../css/Home.css";
 
-const PRODUCTS_API = "http://localhost:5000/api/products";
-const CATEGORIES_API = "http://localhost:5000/api/categories";
+const PRODUCTS_API = "https://mini-mart-cdkr.onrender.com/api/products";
+const CATEGORIES_API = "https://mini-mart-cdkr.onrender.com/api/categories";
 
 const CATEGORY_FALLBACK_IMAGES = {
   Vegetables:

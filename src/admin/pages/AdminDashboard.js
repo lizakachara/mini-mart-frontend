@@ -14,10 +14,10 @@ import {
 
 import "../css/AdminDashboard.css";
 
-const PRODUCTS_API = "http://localhost:5000/api/products";
-const CATEGORIES_API = "http://localhost:5000/api/categories";
-const ORDERS_API = "http://localhost:5000/api/orders";
-const USERS_API = "http://localhost:5000/api/users";
+const PRODUCTS_API = "https://mini-mart-cdkr.onrender.com/api/products";
+const CATEGORIES_API = "https://mini-mart-cdkr.onrender.com/api/categories";
+const ORDERS_API = "https://mini-mart-cdkr.onrender.com/api/orders";
+const USERS_API = "https://mini-mart-cdkr.onrender.com/api/users";
 
 function formatCurrency(amount) {
   return `₹${Number(amount || 0).toLocaleString("en-IN")}`;

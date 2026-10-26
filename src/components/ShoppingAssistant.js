@@ -4,7 +4,7 @@ import { FiMessageCircle, FiSend, FiX } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import "../css/ShoppingAssistant.css";
 
-const ASSISTANT_API = "http://localhost:5000/api/assistant";
+const ASSISTANT_API = "https://mini-mart-cdkr.onrender.com/api/assistant";
 
 function ShoppingAssistant() {
   const { token, isLoggedIn } = useAuth();

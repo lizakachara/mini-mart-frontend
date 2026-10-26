@@ -12,8 +12,8 @@ FaSave,
 import "../css/AdminProducts.css";
 
 function AdminProducts() {
-const API_URL = "http://localhost:5000/api/products";
-const CATEGORIES_URL = "http://localhost:5000/api/categories";
+const API_URL = "https://mini-mart-cdkr.onrender.com/api/products";
+const CATEGORIES_URL = "https://mini-mart-cdkr.onrender.com/api/categories";
 
 // PRODUCTS
 const [products, setProducts] = useState([]);

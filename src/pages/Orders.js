@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "../css/Orders.css";
 
-const ORDERS_API = "http://localhost:5000/api/orders/my-orders";
+const ORDERS_API = "https://mini-mart-cdkr.onrender.com/api/orders/my-orders";
 
 function formatCurrency(amount) {
   return `₹${Number(amount || 0).toLocaleString("en-IN")}`;

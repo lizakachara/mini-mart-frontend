@@ -18,7 +18,7 @@ import { FaChartLine, FaExclamationTriangle } from "react-icons/fa";
 
 import "../css/AdminAnalytics.css";
 
-const ANALYTICS_API = "http://localhost:5000/api/analytics";
+const ANALYTICS_API = "https://mini-mart-cdkr.onrender.com/api/analytics";
 const CHART_COLORS = ["#ed456c", "#ff8a4c", "#2bbbad", "#5b8def", "#9b6bff", "#f5a623"];
 
 function formatCurrency(amount) {

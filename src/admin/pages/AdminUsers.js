@@ -11,8 +11,8 @@ FaSave,
 
 import "../css/AdminUsers.css";
 
-const USERS_API = "http://localhost:5000/api/users";
-const ORDERS_API = "http://localhost:5000/api/orders";
+const USERS_API = "https://mini-mart-cdkr.onrender.com/api/users";
+const ORDERS_API = "https://mini-mart-cdkr.onrender.com/api/orders";
 
 function AdminUsers() {
 const [users, setUsers] = useState([]);

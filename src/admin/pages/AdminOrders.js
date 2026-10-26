@@ -11,7 +11,7 @@ FaBoxOpen,
 
 import "../css/AdminOrders.css";
 
-const API_URL = "http://localhost:5000/api/orders";
+const API_URL = "https://mini-mart-cdkr.onrender.com/api/orders";
 
 function AdminOrders() {
 const [orders, setOrders] = useState([]);

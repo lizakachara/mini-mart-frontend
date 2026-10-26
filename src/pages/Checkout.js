@@ -14,8 +14,8 @@ import {
 } from "react-icons/fi";
 import "../css/Checkout.css";
 
-const API_URL = "http://localhost:5000/api/orders";
-const PROFILE_URL = "http://localhost:5000/api/auth/profile";
+const API_URL = "https://mini-mart-cdkr.onrender.com/api/orders";
+const PROFILE_URL = "https://mini-mart-cdkr.onrender.com/api/auth/profile";
 
 const BANKS = [
   "HDFC Bank",

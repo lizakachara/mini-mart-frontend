@@ -4,8 +4,8 @@ import { CartContext } from "../context/CartContext";
 import { FiHeart } from "react-icons/fi";
 import "../css/Products.css";
 
-const API_URL = "http://localhost:5000/api/products";
-const CATEGORIES_API = "http://localhost:5000/api/categories";
+const API_URL = "https://mini-mart-cdkr.onrender.com/api/products";
+const CATEGORIES_API = "https://mini-mart-cdkr.onrender.com/api/categories";
 
 function Products() {
 const { addToCart } = useContext(CartContext);

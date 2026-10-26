@@ -13,8 +13,8 @@ import {
 import "../css/AdminCategories.css";
 
 function AdminCategories() {
-  const API_URL = "http://localhost:5000/api/categories";
-  const PRODUCTS_API_URL = "http://localhost:5000/api/products";
+  const API_URL = "https://mini-mart-cdkr.onrender.com/api/categories";
+  const PRODUCTS_API_URL = "https://mini-mart-cdkr.onrender.com/api/products";
 
   // CATEGORIES
   const [categories, setCategories] = useState([]);

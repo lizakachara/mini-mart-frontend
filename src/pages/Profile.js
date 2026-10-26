@@ -21,7 +21,7 @@ FiStar,
 
 import "../css/Profile.css";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://mini-mart-cdkr.onrender.com/api";
 
 function Profile() {
 const navigate = useNavigate();
