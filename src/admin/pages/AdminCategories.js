@@ -11,6 +11,7 @@ import {
 } from "react-icons/fa";
 
 import "../css/AdminCategories.css";
+import ImageUpload from "../components/ImageUpload";
 
 function AdminCategories() {
   const API_URL = "https://mini-mart-cdkr.onrender.com/api/categories";
@@ -21,6 +22,7 @@ function AdminCategories() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // SEARCH
   const [search, setSearch] = useState("");
@@ -125,6 +127,8 @@ function AdminCategories() {
   // SAVE CATEGORY
   const handleSaveCategory = async (e) => {
     e.preventDefault();
+
+    if (uploadingImage) return;
 
     if (!formData.name.trim()) {
       alert("Please enter category name.");
@@ -246,7 +250,7 @@ function AdminCategories() {
 
   // CLOSE MODAL
   const closeModal = () => {
-    if (saving) return;
+    if (saving || uploadingImage) return;
 
     setShowModal(false);
     setEditingCategory(null);
@@ -468,17 +472,14 @@ function AdminCategories() {
                 />
               </div>
 
-              <div className="category-form-group">
-                <label>Category Image URL</label>
-
-                <input
-                  type="url"
-                  name="image"
-                  placeholder="https://example.com/image.jpg"
-                  value={formData.image}
-                  onChange={handleChange}
-                />
-              </div>
+              <ImageUpload
+                image={formData.image}
+                onImageChange={(image) =>
+                  setFormData((previous) => ({ ...previous, image }))
+                }
+                onUploadStateChange={setUploadingImage}
+                disabled={saving}
+              />
 
               <div className="category-form-group">
                 <label>Description</label>
@@ -499,7 +500,7 @@ function AdminCategories() {
                   type="button"
                   className="cancel-category-button"
                   onClick={closeModal}
-                  disabled={saving}
+                  disabled={saving || uploadingImage}
                 >
                   Cancel
                 </button>
@@ -507,7 +508,7 @@ function AdminCategories() {
                 <button
                   type="submit"
                   className="save-category-button"
-                  disabled={saving}
+                  disabled={saving || uploadingImage}
                 >
                   <FaSave />
 

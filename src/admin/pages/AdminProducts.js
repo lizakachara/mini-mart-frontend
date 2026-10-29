@@ -10,6 +10,7 @@ FaSave,
 } from "react-icons/fa";
 
 import "../css/AdminProducts.css";
+import ImageUpload from "../components/ImageUpload";
 
 function AdminProducts() {
 const API_URL = "https://mini-mart-cdkr.onrender.com/api/products";
@@ -19,6 +20,7 @@ const CATEGORIES_URL = "https://mini-mart-cdkr.onrender.com/api/categories";
 const [products, setProducts] = useState([]);
 const [loadingProducts, setLoadingProducts] = useState(true);
 const [savingProduct, setSavingProduct] = useState(false);
+const [uploadingImage, setUploadingImage] = useState(false);
 
 // DYNAMIC CATEGORIES
 const [categoryOptions, setCategoryOptions] = useState([]);
@@ -224,6 +226,8 @@ setFormData((previous) => ({
 const handleSaveProduct = async (e) => {
 e.preventDefault();
 
+if (uploadingImage) return;
+
  
 if (
   !formData.name.trim() ||
@@ -395,7 +399,7 @@ try {
 
 // CLOSE MODAL
 const closeModal = () => {
-if (savingProduct) {
+if (savingProduct || uploadingImage) {
 return;
 }
 
@@ -800,18 +804,14 @@ Store Management </p>
             </select>
           </div>
 
-          {/* IMAGE */}
-          <div className="form-group-admin">
-            <label>Product Image URL</label>
-
-            <input
-              type="url"
-              name="image"
-              placeholder="https://example.com/image.jpg"
-              value={formData.image}
-              onChange={handleChange}
-            />
-          </div>
+          <ImageUpload
+            image={formData.image}
+            onImageChange={(image) =>
+              setFormData((previous) => ({ ...previous, image }))
+            }
+            onUploadStateChange={setUploadingImage}
+            disabled={savingProduct}
+          />
 
           {/* DESCRIPTION */}
           <div className="form-group-admin">
@@ -832,7 +832,7 @@ Store Management </p>
               type="button"
               className="cancel-product-button"
               onClick={closeModal}
-              disabled={savingProduct}
+              disabled={savingProduct || uploadingImage}
             >
               Cancel
             </button>
@@ -842,6 +842,7 @@ Store Management </p>
               className="save-product-button"
               disabled={
                 savingProduct ||
+                uploadingImage ||
                 loadingCategories ||
                 categoryOptions.length === 0
               }

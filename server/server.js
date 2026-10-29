@@ -12,12 +12,16 @@ const orderRoutes = require("./routes/orderRoutes");
 const userRoutes = require("./routes/userRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const assistantRoutes = require("./routes/assistantRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
+const path = require("path");
 
 const app = express();
+app.set("trust proxy", 1);
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Database connection
 connectDB();
@@ -35,6 +39,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/assistant", assistantRoutes);
+app.use("/api/uploads", uploadRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;
