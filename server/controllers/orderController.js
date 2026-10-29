@@ -4,6 +4,22 @@ const QRCode = require("qrcode");
 
 const DEMO_QR_TTL_MS = 60 * 1000;
 
+async function restoreReservedStock(reservations) {
+  while (reservations.length > 0) {
+    const reservation = reservations[reservations.length - 1];
+    const result = await Product.updateOne(
+      { _id: reservation.productId },
+      { $inc: { stock: reservation.quantity } }
+    );
+
+    if (result.matchedCount !== 1) {
+      throw new Error(`Unable to restore stock for product ${reservation.productId}.`);
+    }
+
+    reservations.pop();
+  }
+}
+
 // GET ALL ORDERS (ADMIN)
 const getOrders = async (req, res) => {
   try {
@@ -72,6 +88,9 @@ const getOrderById = async (req, res) => {
 
 // CREATE ORDER
 const createOrder = async (req, res) => {
+  const reservedStock = [];
+  let orderPersisted = false;
+
   try {
     const { items, paymentMethod, shippingAddress, phone } = req.body;
 
@@ -79,7 +98,7 @@ const createOrder = async (req, res) => {
       !Array.isArray(items) ||
       items.length === 0 ||
       !shippingAddress ||
-      !["Cash on Delivery", "Online Payment"].includes(paymentMethod)
+      !["Cash on Delivery", "Online Payment", "Card Payment"].includes(paymentMethod)
     ) {
       return res.status(400).json({
         message: "Please provide items, a valid payment method and shipping address.",
@@ -146,6 +165,31 @@ const createOrder = async (req, res) => {
       });
     }
 
+    for (const item of orderItems) {
+      const reservation = await Product.findOneAndUpdate(
+        {
+          _id: item.productId,
+          isActive: true,
+          stock: { $gte: item.quantity },
+        },
+        { $inc: { stock: -item.quantity } },
+        { new: true }
+      );
+
+      if (!reservation) {
+        const error = new Error(
+          `${item.name} does not have enough stock for this order.`
+        );
+        error.statusCode = 409;
+        throw error;
+      }
+
+      reservedStock.push({
+        productId: item.productId,
+        quantity: item.quantity,
+      });
+    }
+
     const order = await Order.create({
       userId: req.user.id,
       items: orderItems,
@@ -153,12 +197,15 @@ const createOrder = async (req, res) => {
       paymentMethod:
         paymentMethod === "Online Payment"
           ? "Demo Online Payment"
-          : paymentMethod,
+          : paymentMethod === "Card Payment"
+            ? "Demo Card Payment"
+            : paymentMethod,
       paymentStatus: "Pending",
       orderStatus: "Pending",
       shippingAddress: String(shippingAddress).trim(),
       phone: phone || "",
     });
+    orderPersisted = true;
 
     if (paymentMethod === "Online Payment") {
       try {
@@ -188,6 +235,8 @@ const createOrder = async (req, res) => {
         });
       } catch (error) {
         await Order.findByIdAndDelete(order._id);
+        orderPersisted = false;
+        await restoreReservedStock(reservedStock);
         throw error;
       }
     }
@@ -198,6 +247,17 @@ const createOrder = async (req, res) => {
     });
   } catch (error) {
     console.error("Create Order Error:", error.message);
+
+    if (!orderPersisted && reservedStock.length > 0) {
+      try {
+        await restoreReservedStock(reservedStock);
+      } catch (stockError) {
+        console.error("Restore Reserved Stock Error:", stockError.message);
+        return res.status(500).json({
+          message: "Order failed and stock could not be restored. Please contact support.",
+        });
+      }
+    }
 
     res.status(error.statusCode || 500).json({
       message: error.message || "Failed to place order.",

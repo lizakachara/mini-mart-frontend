@@ -17,11 +17,12 @@ const getOrderPaymentStatus = async (req, res) => {
       return res.status(403).json({ message: "You are not allowed to view this payment." });
     }
 
-    if (order.paymentMethod !== "Demo Online Payment") {
-      return res.status(400).json({ message: "This order has no demo QR payment." });
+    if (!["Demo Online Payment", "Demo Card Payment"].includes(order.paymentMethod)) {
+      return res.status(400).json({ message: "This order has no online payment." });
     }
 
     if (
+      order.paymentMethod === "Demo Online Payment" &&
       order.paymentStatus === "Pending" &&
       Date.now() >= new Date(order.paymentQrExpiresAt).getTime()
     ) {
@@ -31,8 +32,8 @@ const getOrderPaymentStatus = async (req, res) => {
 
     res.status(200).json({ paymentStatus: order.paymentStatus, order });
   } catch (error) {
-    console.error("Get Demo Payment Status Error:", error.message);
-    res.status(500).json({ message: "Unable to verify demo payment status." });
+    console.error("Get Payment Status Error:", error.message);
+    res.status(500).json({ message: "Unable to verify payment status." });
   }
 };
 
@@ -48,33 +49,37 @@ const completeDemoPayment = async (req, res) => {
       return res.status(403).json({ message: "You are not allowed to complete this payment." });
     }
 
-    if (order.paymentMethod !== "Demo Online Payment") {
-      return res.status(400).json({ message: "This order is not using demo online payment." });
+    if (!["Demo Online Payment", "Demo Card Payment"].includes(order.paymentMethod)) {
+      return res.status(400).json({ message: "This order is not using online payment." });
     }
 
     if (order.paymentStatus !== "Pending") {
       return res.status(409).json({ message: `This payment is already ${order.paymentStatus.toLowerCase()}.` });
     }
 
-    if (!order.paymentQrExpiresAt || Date.now() >= order.paymentQrExpiresAt.getTime()) {
+    if (
+      order.paymentMethod === "Demo Online Payment" &&
+      (!order.paymentQrExpiresAt || Date.now() >= order.paymentQrExpiresAt.getTime())
+    ) {
       order.paymentStatus = "Expired";
       await order.save();
-      return res.status(410).json({ message: "This demo QR has expired. Generate a new one." });
+      return res.status(410).json({ message: "This QR has expired. Generate a new one." });
     }
 
     order.paymentStatus = "Paid";
-    order.paymentChannel = "demo";
+    order.paymentChannel =
+      order.paymentMethod === "Demo Card Payment" ? "card" : "demo";
     order.paymentId = `DEMO-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
     order.orderStatus = "Confirmed";
     await order.save();
 
     res.status(200).json({
-      message: "Demo payment completed. No real money was charged.",
+      message: " payment completed.",
       order,
     });
   } catch (error) {
-    console.error("Complete Demo Payment Error:", error.message);
-    res.status(500).json({ message: "Unable to complete demo payment." });
+    console.error("Complete Payment Error:", error.message);
+    res.status(500).json({ message: "Unable to complete payment." });
   }
 };
 

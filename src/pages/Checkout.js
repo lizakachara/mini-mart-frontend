@@ -23,6 +23,12 @@ function Checkout() {
   const navigate = useNavigate();
 
   const [paymentMethod, setPaymentMethod] = useState("Cash on Delivery");
+  const [cardData, setCardData] = useState({
+    holder: "",
+    number: "",
+    expiry: "",
+    cvv: "",
+  });
   const [formData, setFormData] = useState({
     fullName: "",
     mobile: "",
@@ -38,6 +44,8 @@ function Checkout() {
   const [paymentSecondsLeft, setPaymentSecondsLeft] = useState(60);
   const [paymentExpired, setPaymentExpired] = useState(false);
   const [completingDemoPayment, setCompletingDemoPayment] = useState(false);
+  const [pendingCardPayment, setPendingCardPayment] = useState(null);
+  const [completingCardPayment, setCompletingCardPayment] = useState(false);
   const authToken =
     token || sessionStorage.getItem("token") || localStorage.getItem("token");
 
@@ -97,11 +105,69 @@ function Checkout() {
     }));
   };
 
+  const handleCardChange = (event) => {
+    const { name, value } = event.target;
+    let nextValue = value;
+
+    if (name === "number") {
+      nextValue = value
+        .replace(/\D/g, "")
+        .slice(0, 16)
+        .replace(/(\d{4})(?=\d)/g, "$1 ");
+    } else if (name === "expiry") {
+      const digits = value.replace(/\D/g, "").slice(0, 4);
+      nextValue = digits.length > 2
+        ? `${digits.slice(0, 2)}/${digits.slice(2)}`
+        : digits;
+    } else if (name === "cvv") {
+      nextValue = value.replace(/\D/g, "").slice(0, 3);
+    }
+
+    setCardData((previous) => ({ ...previous, [name]: nextValue }));
+  };
+
+  const completeCardPayment = async (cardPayment) => {
+    if (!cardPayment || !authToken || completingCardPayment) return;
+
+    setError("");
+    setCompletingCardPayment(true);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/${cardPayment.orderId}/payment/demo-complete`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${authToken}` },
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to complete the card payment.");
+      }
+
+      if (typeof clearCart === "function") clearCart();
+      setPendingCardPayment(null);
+      navigate("/order-confirmation", {
+        state: {
+          order: data.order,
+          customerName: formData.fullName,
+          totalAmount: data.order.totalAmount,
+        },
+      });
+    } catch (paymentError) {
+      console.error("Complete Card Payment Error:", paymentError);
+      setError(paymentError.message || "Unable to complete the card payment.");
+    } finally {
+      setCompletingCardPayment(false);
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
 
-    if (activePayment) return;
+    if (activePayment || pendingCardPayment) return;
 
     if (cartItems.length === 0) {
       setError("Your cart is empty.");
@@ -126,6 +192,28 @@ function Checkout() {
       return;
     }
 
+    if (paymentMethod === "Card Payment") {
+      const cardNumber = cardData.number.replace(/\s/g, "");
+      const [monthText, yearText] = cardData.expiry.split("/");
+      const month = Number(monthText);
+      const year = Number("20" + yearText);
+      const expiryDate = new Date(year, month, 0, 23, 59, 59, 999);
+      const testCardIsValid =
+        cardData.holder.trim().length >= 2 &&
+        cardNumber === "4242424242424242" &&
+        month >= 1 &&
+        month <= 12 &&
+        yearText &&
+        yearText.length === 2 &&
+        expiryDate > new Date() &&
+        /^\d{3}$/.test(cardData.cvv);
+
+      if (!testCardIsValid) {
+        setError("Use the test card details shown below. No real card is charged.");
+        return;
+      }
+    }
+
     const items = cartItems.map((item) => ({
       productId: item._id || item.id,
       quantity: Number(item.quantity) || 1,
@@ -148,12 +236,13 @@ function Checkout() {
       formData.address.trim(),
       formData.city.trim(),
       formData.state.trim(),
-      `Pincode: ${pincode}`,
+      "Pincode: " + pincode
     ].join(", ");
 
     const orderData = {
       items,
-      paymentMethod,
+      paymentMethod:
+        paymentMethod === "Card Payment" ? "Online Payment" : paymentMethod,
       shippingAddress,
       phone: mobile,
     };
@@ -190,6 +279,17 @@ function Checkout() {
           expiresAt: data.paymentQr.expiresAt,
           order: data.order,
         });
+        return;
+      }
+
+      if (paymentMethod === "Card Payment") {
+        if (!data.order?._id) {
+          throw new Error("The payment server returned an invalid card order.");
+        }
+
+        const cardPayment = { orderId: data.order._id, order: data.order };
+        setPendingCardPayment(cardPayment);
+        await completeCardPayment(cardPayment);
         return;
       }
 
@@ -231,7 +331,7 @@ function Checkout() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Unable to complete demo payment.");
+        throw new Error(data.message || "Unable to complete the payment.");
       }
 
       if (typeof clearCart === "function") clearCart();
@@ -244,7 +344,7 @@ function Checkout() {
         },
       });
     } catch (demoError) {
-      setError(demoError.message || "Unable to complete demo payment.");
+      setError(demoError.message || "Unable to complete the payment.");
     } finally {
       setCompletingDemoPayment(false);
     }
@@ -328,11 +428,13 @@ function Checkout() {
   const payLabel =
     paymentMethod === "Online Payment"
       ? activePayment
-        ? "Demo payment pending..."
+        ? "UPI payment pending..."
         : paymentExpired
-        ? `Generate new demo QR · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
-        : `Generate demo QR · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
-      : `Place Order · ₹${displayedTotalAmount.toLocaleString("en-IN")}`;
+          ? `Generate new QR · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
+          : `Generate UPI QR · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
+      : paymentMethod === "Card Payment"
+        ? `Pay by card · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
+        : `Place Order · ₹${displayedTotalAmount.toLocaleString("en-IN")}`;
 
   return (
     <div className="checkout-page">
@@ -341,7 +443,7 @@ function Checkout() {
 
       <div className="checkout-shell">
         <div className="checkout-heading">
-          <p className="checkout-kicker">Demo grocery checkout</p>
+          <p className="checkout-kicker">Grocery checkout</p>
           <h1>Almost there</h1>
           <p>Confirm delivery details and pay in a few seconds.</p>
         </div>
@@ -482,7 +584,7 @@ function Checkout() {
                   <div>
                     <h4>Payment method</h4>
                     <p className="checkout-card-text">
-                      Choose cash on delivery or try the simulated online payment.
+                      Choose cash on delivery, UPI QR, or card.
                     </p>
                   </div>
                 </div>
@@ -496,7 +598,7 @@ function Checkout() {
                         : "payment-tile"
                     }
                     onClick={() => setPaymentMethod("Cash on Delivery")}
-                    disabled={Boolean(activePayment)}
+                    disabled={Boolean(activePayment || pendingCardPayment)}
                   >
                     <FiTruck />
                     <strong>Cash on Delivery</strong>
@@ -511,18 +613,33 @@ function Checkout() {
                         : "payment-tile"
                     }
                     onClick={() => setPaymentMethod("Online Payment")}
-                    disabled={Boolean(activePayment)}
+                    disabled={Boolean(activePayment || pendingCardPayment)}
                   >
                     <FiLock />
-                    <strong>Online payment demo</strong>
-                    <span>Demo QR · no real charge</span>
+                    <strong>UPI QR</strong>
+                    <span>Test payment · no real charge</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      paymentMethod === "Card Payment"
+                        ? "payment-tile selected"
+                        : "payment-tile"
+                    }
+                    onClick={() => setPaymentMethod("Card Payment")}
+                    disabled={Boolean(activePayment || pendingCardPayment)}
+                  >
+                    <FiCreditCard />
+                    <strong>Card</strong>
+                    <span>Test payment · no real charge</span>
                   </button>
                 </div>
 
                 {paymentMethod === "Online Payment" && (
                   <div className="online-pay-panel">
                     <div className="qr-payment-heading">
-                      <strong>Demo UPI-style QR</strong>
+                      <strong>UPI QR payment</strong>
                       <span>Fixed amount · 1 minute</span>
                     </div>
 
@@ -530,7 +647,7 @@ function Checkout() {
                       <div className="payment-qr-view">
                         <img
                           src={activePayment.imageUrl}
-                          alt={`Demo payment QR for ₹${activePayment.order.totalAmount}`}
+                          alt={`UPI payment QR for ₹${activePayment.order.totalAmount}`}
                         />
                         <strong>
                           ₹{Number(activePayment.order.totalAmount).toLocaleString("en-IN")}
@@ -540,7 +657,7 @@ function Checkout() {
                             ? `Scan within ${String(Math.floor(paymentSecondsLeft / 60)).padStart(2, "0")}:${String(paymentSecondsLeft % 60).padStart(2, "0")}`
                             : "Checking payment status..."}
                         </span>
-                        <p>Demo only. Scanning this code will not charge money.</p>
+                        <p>Scanning this code will not charge money.</p>
                         <button
                           className="demo-payment-complete-button"
                           type="button"
@@ -548,8 +665,8 @@ function Checkout() {
                           disabled={completingDemoPayment || paymentSecondsLeft === 0}
                         >
                           {completingDemoPayment
-                            ? "Completing demo..."
-                            : "Complete demo payment"}
+                            ? "Completing payment..."
+                            : "Complete test payment"}
                         </button>
                       </div>
                     ) : paymentExpired ? (
@@ -558,14 +675,115 @@ function Checkout() {
                       </p>
                     ) : (
                       <p className="pay-hint">
-                        A demo QR for ₹{displayedTotalAmount.toLocaleString("en-IN")} will appear. It does not collect money.
+                        A QR for ₹{displayedTotalAmount.toLocaleString("en-IN")} will appear. It does not collect money.
                       </p>
                     )}
 
                     <div className="secure-note">
                       <FiShield />
-                      The amount is fixed by the server. This is a demo only; no real payment is made.
+                      The amount is fixed by the server. No real payment is made.
                     </div>
+                  </div>
+                )}
+
+                {paymentMethod === "Card Payment" && (
+                  <div className="online-pay-panel">
+                    {pendingCardPayment ? (
+                      <div className="payment-qr-view">
+                        <strong>Card payment pending</strong>
+                        <p>No money has been charged. Retry to finish this test payment.</p>
+                        <button
+                          className="demo-payment-complete-button"
+                          type="button"
+                          onClick={() => completeCardPayment(pendingCardPayment)}
+                          disabled={completingCardPayment}
+                        >
+                          {completingCardPayment
+                            ? "Completing payment..."
+                            : "Complete test payment"}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="card-pay-layout">
+                          <div className="preview-card" aria-hidden="true">
+                            <div className="preview-card-top">
+                              <span>TEST CARD</span>
+                              <span>•••</span>
+                            </div>
+                            <div className="preview-card-number">
+                              {cardData.number || "•••• •••• •••• 4242"}
+                            </div>
+                            <div className="preview-card-bottom">
+                              <span>{cardData.holder || "CARDHOLDER"}</span>
+                              <span>{cardData.expiry || "MM/YY"}</span>
+                            </div>
+                          </div>
+
+                          <div className="pay-fields">
+                            <label>
+                              Cardholder name
+                              <input
+                                className="checkout-input"
+                                name="holder"
+                                autoComplete="off"
+                                value={cardData.holder}
+                                onChange={handleCardChange}
+                                required
+                              />
+                            </label>
+                            <label>
+                              Test card number
+                              <input
+                                className="checkout-input"
+                                name="number"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                placeholder="4242 4242 4242 4242"
+                                value={cardData.number}
+                                onChange={handleCardChange}
+                                required
+                              />
+                            </label>
+                            <div className="pay-fields-row">
+                              <label>
+                                Expiry date
+                                <input
+                                  className="checkout-input"
+                                  name="expiry"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  placeholder="MM/YY"
+                                  maxLength="5"
+                                  value={cardData.expiry}
+                                  onChange={handleCardChange}
+                                  required
+                                />
+                              </label>
+                              <label>
+                                Security code
+                                <input
+                                  className="checkout-input"
+                                  name="cvv"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  placeholder="123"
+                                  maxLength="3"
+                                  value={cardData.cvv}
+                                  onChange={handleCardChange}
+                                  required
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="secure-note">
+                          Test card only: use 4242 4242 4242 4242, any future
+                          expiry, and any 3-digit code. Card details stay in
+                          this browser and are never sent or charged.
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </section>
@@ -632,11 +850,17 @@ function Checkout() {
               <button
                 type="submit"
                 className="place-order-button"
-                disabled={placingOrder || Boolean(activePayment)}
+                disabled={
+                  placingOrder ||
+                  Boolean(activePayment || pendingCardPayment) ||
+                  completingCardPayment
+                }
               >
                 {placingOrder ? (
                   paymentMethod === "Online Payment"
                       ? "Generating payment QR..."
+                    : paymentMethod === "Card Payment"
+                      ? "Processing test card..."
                     : "Placing order..."
                 ) : (
                   <>
@@ -647,7 +871,7 @@ function Checkout() {
               </button>
 
               <p className="trust-row">
-                <FiLock /> Demo payments are simulated · Free same-day delivery slot
+                <FiLock /> Test payments are not charged · Free same-day delivery slot
               </p>
 
               <Link to="/cart" className="back-cart-link">
@@ -664,7 +888,7 @@ function Checkout() {
             <div className="pay-spinner" />
             <h3>
               {paymentMethod === "Online Payment"
-                ? "Generating demo QR"
+                ? "Generating QR"
                 : "Placing your order"}
             </h3>
             <p>

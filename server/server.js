@@ -13,6 +13,7 @@ const userRoutes = require("./routes/userRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const assistantRoutes = require("./routes/assistantRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const { serveImage } = require("./services/imageStorage");
 const path = require("path");
 
 const app = express();
@@ -22,6 +23,7 @@ app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.get("/uploads/:filename", serveImage);
 
 // Database connection
 connectDB();

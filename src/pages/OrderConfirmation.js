@@ -14,7 +14,12 @@ function OrderConfirmation() {
 
   const paymentStatus = order?.paymentStatus || "Pending";
   const paymentMethod = order?.paymentMethod || "Payment";
-  const isDemoPayment = paymentMethod === "Demo Online Payment";
+  const paymentMethodLabel =
+    paymentMethod === "Demo Online Payment"
+      ? "UPI QR"
+      : paymentMethod === "Demo Card Payment"
+        ? "Card"
+        : paymentMethod;
   const orderStatus = order?.orderStatus || "Pending";
 
   return (
@@ -24,19 +29,15 @@ function OrderConfirmation() {
           <div className="confirmation-icon">✓</div>
 
           <h1>
-            {isDemoPayment
-              ? "Demo payment complete"
-              : paymentStatus === "Paid"
-              ? "Payment successful"
+            {paymentStatus === "Paid"
+              ? "Payment complete"
               : "Order placed successfully"}
           </h1>
 
           <p className="confirmation-message">
             {customerName ? `Thanks, ${customerName}. ` : "Thank you for shopping with Mini Mart. "}
-            {isDemoPayment
-              ? "This was a simulated payment. No real money was charged."
-              : paymentStatus === "Paid"
-              ? "Your online payment has been received and the order is confirmed."
+            {paymentStatus === "Paid"
+              ? "Your payment has been processed successfully."
               : "Your order has been received and will be prepared for delivery."}
           </p>
 
@@ -47,7 +48,7 @@ function OrderConfirmation() {
 
           {order?.paymentId ? (
             <p className="confirmation-message">
-              Payment ID: {order.paymentId}
+              Payment reference: {String(order.paymentId).replace(/^DEMO-/i, "SIM-")}
             </p>
           ) : null}
 
@@ -61,7 +62,7 @@ function OrderConfirmation() {
               <span>Payment</span>
               <strong>
                 {paymentStatus}
-                {paymentMethod ? ` · ${paymentMethod}` : ""}
+                {paymentMethodLabel ? ` · ${paymentMethodLabel}` : ""}
               </strong>
             </div>
 
