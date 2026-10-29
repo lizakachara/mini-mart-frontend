@@ -13,6 +13,7 @@ const {
   protect,
   adminOnly,
 } = require("../middleware/authMiddleware");
+const { getOrderPaymentStatus } = require("../controllers/paymentController");
 
 const router = express.Router();
 
@@ -27,6 +28,9 @@ router.get("/:id", protect, getOrderById);
 
 // CUSTOMER: Place an order
 router.post("/", protect, createOrder);
+
+// CUSTOMER OR ADMIN: Verify an order's online payment
+router.get("/:id/payment", protect, getOrderPaymentStatus);
 
 // ADMIN ONLY: Update order and payment status
 router.patch("/:id/status", protect, adminOnly, updateOrderStatus);

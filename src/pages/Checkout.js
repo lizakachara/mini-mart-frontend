@@ -17,78 +17,12 @@ import "../css/Checkout.css";
 const API_URL = "https://mini-mart-cdkr.onrender.com/api/orders";
 const PROFILE_URL = "https://mini-mart-cdkr.onrender.com/api/auth/profile";
 
-const BANKS = [
-  "HDFC Bank",
-  "SBI",
-  "ICICI Bank",
-  "Axis Bank",
-  "Kotak Mahindra Bank",
-  "Punjab National Bank",
-];
-
-function luhnCheck(number) {
-  const digits = number.replace(/\D/g, "");
-  let sum = 0;
-  let shouldDouble = false;
-
-  for (let i = digits.length - 1; i >= 0; i -= 1) {
-    let digit = Number(digits[i]);
-
-    if (shouldDouble) {
-      digit *= 2;
-      if (digit > 9) digit -= 9;
-    }
-
-    sum += digit;
-    shouldDouble = !shouldDouble;
-  }
-
-  return digits.length >= 13 && digits.length <= 19 && sum % 10 === 0;
-}
-
-function detectCardBrand(number) {
-  const digits = number.replace(/\D/g, "");
-  if (/^4/.test(digits)) return "Visa";
-  if (/^5[1-5]/.test(digits) || /^2[2-7]/.test(digits)) return "Mastercard";
-  if (/^3[47]/.test(digits)) return "Amex";
-  if (/^6/.test(digits)) return "RuPay";
-  return "Card";
-}
-
-function formatCardNumber(value) {
-  return value
-    .replace(/\D/g, "")
-    .slice(0, 16)
-    .replace(/(.{4})/g, "$1 ")
-    .trim();
-}
-
-function formatExpiry(value) {
-  const digits = value.replace(/\D/g, "").slice(0, 4);
-  if (digits.length < 3) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-}
-
-function isExpiryValid(value) {
-  const match = /^(\d{2})\/(\d{2})$/.exec(value);
-  if (!match) return false;
-
-  const month = Number(match[1]);
-  const year = 2000 + Number(match[2]);
-  if (month < 1 || month > 12) return false;
-
-  const now = new Date();
-  const expiry = new Date(year, month, 0, 23, 59, 59);
-  return expiry >= now;
-}
-
 function Checkout() {
   const { cartItems, clearCart } = useContext(CartContext);
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const [paymentMethod, setPaymentMethod] = useState("Cash on Delivery");
-  const [onlineChannel, setOnlineChannel] = useState("upi");
   const [formData, setFormData] = useState({
     fullName: "",
     mobile: "",
@@ -97,16 +31,14 @@ function Checkout() {
     state: "",
     pincode: "",
   });
-  const [upiId, setUpiId] = useState("");
-  const [card, setCard] = useState({
-    number: "",
-    holder: "",
-    expiry: "",
-    cvv: "",
-  });
-  const [bank, setBank] = useState("");
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState("");
+  const [activePayment, setActivePayment] = useState(null);
+  const [serverOrder, setServerOrder] = useState(null);
+  const [paymentSecondsLeft, setPaymentSecondsLeft] = useState(60);
+  const [paymentExpired, setPaymentExpired] = useState(false);
+  const authToken =
+    token || sessionStorage.getItem("token") || localStorage.getItem("token");
 
   const totalAmount = useMemo(
     () =>
@@ -126,6 +58,9 @@ function Checkout() {
       ),
     [cartItems]
   );
+
+  const displayedItems = serverOrder?.items || cartItems;
+  const displayedTotalAmount = Number(serverOrder?.totalAmount ?? totalAmount);
 
   useEffect(() => {
     if (!token) return;
@@ -161,53 +96,11 @@ function Checkout() {
     }));
   };
 
-  const buildPaymentPayload = () => {
-    if (paymentMethod !== "Online Payment") return undefined;
-
-    if (onlineChannel === "upi") {
-      const value = upiId.trim().toLowerCase();
-      if (!/^[a-zA-Z0-9._-]{2,}@[a-zA-Z]{2,}$/.test(value)) {
-        throw new Error("Enter a valid UPI ID, for example yourname@oksbi.");
-      }
-      return { channel: "upi", upiId: value };
-    }
-
-    if (onlineChannel === "card") {
-      const number = card.number.replace(/\s/g, "");
-      const holder = card.holder.trim();
-      const cvv = card.cvv.trim();
-
-      if (!luhnCheck(number)) {
-        throw new Error("Enter a valid card number to pay online.");
-      }
-      if (holder.length < 2) {
-        throw new Error("Enter the name printed on the card.");
-      }
-      if (!isExpiryValid(card.expiry)) {
-        throw new Error("Enter a valid card expiry date.");
-      }
-      if (!/^\d{3,4}$/.test(cvv)) {
-        throw new Error("Enter a valid CVV.");
-      }
-
-      return {
-        channel: "card",
-        cardLast4: number.slice(-4),
-        cardHolder: holder,
-        cardBrand: detectCardBrand(number),
-      };
-    }
-
-    if (!bank) {
-      throw new Error("Select your bank to continue with net banking.");
-    }
-
-    return { channel: "netbanking", bank };
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+
+    if (activePayment) return;
 
     if (cartItems.length === 0) {
       setError("Your cart is empty.");
@@ -227,11 +120,6 @@ function Checkout() {
       return;
     }
 
-    const authToken =
-      token ||
-      sessionStorage.getItem("token") ||
-      localStorage.getItem("token");
-
     if (!authToken) {
       setError("Please log in before placing your order.");
       return;
@@ -239,33 +127,18 @@ function Checkout() {
 
     const items = cartItems.map((item) => ({
       productId: item._id || item.id,
-      name: item.name,
-      image: item.image || "",
-      price: Number(item.price),
       quantity: Number(item.quantity) || 1,
-      unit: item.unit || "",
     }));
 
     if (
       items.some(
         (item) =>
-          !item.productId ||
-          !Number.isFinite(item.price) ||
-          item.price < 0 ||
-          item.quantity < 1
+          !item.productId || !Number.isInteger(item.quantity) || item.quantity < 1
       )
     ) {
       setError(
         "One or more cart items have invalid product information. Please review your cart."
       );
-      return;
-    }
-
-    let payment;
-    try {
-      payment = buildPaymentPayload();
-    } catch (validationError) {
-      setError(validationError.message);
       return;
     }
 
@@ -279,11 +152,9 @@ function Checkout() {
 
     const orderData = {
       items,
-      totalAmount,
       paymentMethod,
       shippingAddress,
       phone: mobile,
-      ...(payment ? { payment } : {}),
     };
 
     try {
@@ -304,6 +175,23 @@ function Checkout() {
         throw new Error(data.message || "Could not place your order.");
       }
 
+      if (paymentMethod === "Online Payment") {
+        if (!data.order?._id || !data.paymentQr?.imageUrl || !data.paymentQr?.expiresAt) {
+          throw new Error("The payment server returned an invalid QR response.");
+        }
+
+        setPaymentExpired(false);
+        setPaymentSecondsLeft(60);
+        setServerOrder(data.order);
+        setActivePayment({
+          orderId: data.order._id,
+          imageUrl: data.paymentQr.imageUrl,
+          expiresAt: data.paymentQr.expiresAt,
+          order: data.order,
+        });
+        return;
+      }
+
       if (typeof clearCart === "function") {
         clearCart();
       }
@@ -312,7 +200,7 @@ function Checkout() {
         state: {
           order: data.order || data,
           customerName: formData.fullName,
-          totalAmount,
+          totalAmount: data.order?.totalAmount ?? totalAmount,
         },
       });
     } catch (err) {
@@ -324,6 +212,64 @@ function Checkout() {
       setPlacingOrder(false);
     }
   };
+
+  useEffect(() => {
+    if (!activePayment || !authToken) return undefined;
+
+    let stopped = false;
+    let pollTimeout;
+    const expiresAt = new Date(activePayment.expiresAt).getTime();
+
+    const checkPayment = async () => {
+      if (stopped) return;
+
+      setPaymentSecondsLeft(
+        Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000))
+      );
+
+      try {
+        const response = await fetch(
+          `${API_URL}/${activePayment.orderId}/payment`,
+          { headers: { Authorization: `Bearer ${authToken}` } }
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Unable to verify payment.");
+        }
+
+        if (data.paymentStatus === "Paid") {
+          if (typeof clearCart === "function") clearCart();
+          setActivePayment(null);
+          navigate("/order-confirmation", {
+            state: {
+              order: data.order,
+              customerName: formData.fullName,
+              totalAmount: data.order.totalAmount,
+            },
+          });
+          return;
+        }
+
+        if (data.paymentStatus === "Expired" || Date.now() >= expiresAt) {
+          setActivePayment(null);
+          setPaymentExpired(true);
+          return;
+        }
+      } catch (paymentError) {
+        setError(paymentError.message || "Unable to verify payment.");
+      }
+
+      if (!stopped) pollTimeout = setTimeout(checkPayment, 2000);
+    };
+
+    checkPayment();
+
+    return () => {
+      stopped = true;
+      clearTimeout(pollTimeout);
+    };
+  }, [activePayment, authToken, clearCart, formData.fullName, navigate]);
 
   if (cartItems.length === 0) {
     return (
@@ -342,11 +288,14 @@ function Checkout() {
     );
   }
 
-  const cardBrand = detectCardBrand(card.number);
   const payLabel =
     paymentMethod === "Online Payment"
-      ? `Pay ₹${totalAmount.toLocaleString("en-IN")}`
-      : `Place Order · ₹${totalAmount.toLocaleString("en-IN")}`;
+      ? activePayment
+        ? "Waiting for payment..."
+        : paymentExpired
+        ? `Generate new QR · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
+        : `Pay ₹${displayedTotalAmount.toLocaleString("en-IN")}`
+      : `Place Order · ₹${displayedTotalAmount.toLocaleString("en-IN")}`;
 
   return (
     <div className="checkout-page">
@@ -401,6 +350,7 @@ function Checkout() {
                       placeholder="Enter your full name"
                       value={formData.fullName}
                       onChange={handleChange}
+                      disabled={Boolean(activePayment)}
                       autoComplete="name"
                       required
                     />
@@ -415,6 +365,7 @@ function Checkout() {
                       placeholder="10-digit mobile"
                       value={formData.mobile}
                       onChange={handleChange}
+                      disabled={Boolean(activePayment)}
                       autoComplete="tel"
                       maxLength="10"
                       inputMode="numeric"
@@ -431,6 +382,7 @@ function Checkout() {
                       placeholder="6-digit pincode"
                       value={formData.pincode}
                       onChange={handleChange}
+                      disabled={Boolean(activePayment)}
                       autoComplete="postal-code"
                       maxLength="6"
                       inputMode="numeric"
@@ -447,6 +399,7 @@ function Checkout() {
                       placeholder="House no, street, landmark"
                       value={formData.address}
                       onChange={handleChange}
+                      disabled={Boolean(activePayment)}
                       autoComplete="street-address"
                       required
                     />
@@ -461,6 +414,7 @@ function Checkout() {
                       placeholder="City"
                       value={formData.city}
                       onChange={handleChange}
+                      disabled={Boolean(activePayment)}
                       autoComplete="address-level2"
                       required
                     />
@@ -475,6 +429,7 @@ function Checkout() {
                       placeholder="State"
                       value={formData.state}
                       onChange={handleChange}
+                      disabled={Boolean(activePayment)}
                       autoComplete="address-level1"
                       required
                     />
@@ -504,6 +459,7 @@ function Checkout() {
                         : "payment-tile"
                     }
                     onClick={() => setPaymentMethod("Cash on Delivery")}
+                    disabled={Boolean(activePayment)}
                   >
                     <FiTruck />
                     <strong>Cash on Delivery</strong>
@@ -518,6 +474,7 @@ function Checkout() {
                         : "payment-tile"
                     }
                     onClick={() => setPaymentMethod("Online Payment")}
+                    disabled={Boolean(activePayment)}
                   >
                     <FiLock />
                     <strong>Pay online</strong>
@@ -527,165 +484,40 @@ function Checkout() {
 
                 {paymentMethod === "Online Payment" && (
                   <div className="online-pay-panel">
-                    <div className="channel-tabs">
-                      <button
-                        type="button"
-                        className={onlineChannel === "upi" ? "active" : ""}
-                        onClick={() => setOnlineChannel("upi")}
-                      >
-                        UPI
-                      </button>
-                      <button
-                        type="button"
-                        className={onlineChannel === "card" ? "active" : ""}
-                        onClick={() => setOnlineChannel("card")}
-                      >
-                        Card
-                      </button>
-                      <button
-                        type="button"
-                        className={onlineChannel === "netbanking" ? "active" : ""}
-                        onClick={() => setOnlineChannel("netbanking")}
-                      >
-                        Net banking
-                      </button>
+                    <div className="qr-payment-heading">
+                      <strong>Pay by UPI QR</strong>
+                      <span>Fixed amount · expires in 1 minute</span>
                     </div>
 
-                    {onlineChannel === "upi" && (
-                      <div className="pay-fields">
-                        <label>
-                          UPI ID
-                          <input
-                            type="text"
-                            className="checkout-input"
-                            placeholder="yourname@oksbi"
-                            value={upiId}
-                            onChange={(event) => setUpiId(event.target.value)}
-                            autoComplete="off"
-                          />
-                        </label>
-                        <p className="pay-hint">
-                          We will request ₹{totalAmount.toLocaleString("en-IN")} from this UPI ID.
-                        </p>
+                    {activePayment ? (
+                      <div className="payment-qr-view">
+                        <img
+                          src={activePayment.imageUrl}
+                          alt={`UPI payment QR for ₹${activePayment.order.totalAmount}`}
+                        />
+                        <strong>
+                          ₹{Number(activePayment.order.totalAmount).toLocaleString("en-IN")}
+                        </strong>
+                        <span>
+                          {paymentSecondsLeft > 0
+                            ? `Scan within ${String(Math.floor(paymentSecondsLeft / 60)).padStart(2, "0")}:${String(paymentSecondsLeft % 60).padStart(2, "0")}`
+                            : "Checking payment status..."}
+                        </span>
+                        <p>Payment is verified securely. Keep this page open.</p>
                       </div>
-                    )}
-
-                    {onlineChannel === "card" && (
-                      <div className="card-pay-layout">
-                        <div className="preview-card">
-                          <div className="preview-card-top">
-                            <span>Mini Mart Pay</span>
-                            <strong>{cardBrand}</strong>
-                          </div>
-                          <p className="preview-card-number">
-                            {card.number || "•••• •••• •••• ••••"}
-                          </p>
-                          <div className="preview-card-bottom">
-                            <span>{card.holder || "CARD HOLDER"}</span>
-                            <span>{card.expiry || "MM/YY"}</span>
-                          </div>
-                        </div>
-
-                        <div className="pay-fields">
-                          <label>
-                            Card number
-                            <input
-                              type="text"
-                              className="checkout-input"
-                              placeholder="ACCT-000015"
-                              value={card.number}
-                              onChange={(event) =>
-                                setCard((previous) => ({
-                                  ...previous,
-                                  number: formatCardNumber(event.target.value),
-                                }))
-                              }
-                              inputMode="numeric"
-                              autoComplete="cc-number"
-                            />
-                          </label>
-                          <label>
-                            Name on card
-                            <input
-                              type="text"
-                              className="checkout-input"
-                              placeholder="Name as on card"
-                              value={card.holder}
-                              onChange={(event) =>
-                                setCard((previous) => ({
-                                  ...previous,
-                                  holder: event.target.value.toUpperCase(),
-                                }))
-                              }
-                              autoComplete="cc-name"
-                            />
-                          </label>
-                          <div className="pay-fields-row">
-                            <label>
-                              Expiry
-                              <input
-                                type="text"
-                                className="checkout-input"
-                                placeholder="MM/YY"
-                                value={card.expiry}
-                                onChange={(event) =>
-                                  setCard((previous) => ({
-                                    ...previous,
-                                    expiry: formatExpiry(event.target.value),
-                                  }))
-                                }
-                                inputMode="numeric"
-                                autoComplete="cc-exp"
-                              />
-                            </label>
-                            <label>
-                              CVV
-                              <input
-                                type="password"
-                                className="checkout-input"
-                                placeholder="•••"
-                                value={card.cvv}
-                                onChange={(event) =>
-                                  setCard((previous) => ({
-                                    ...previous,
-                                    cvv: event.target.value.replace(/\D/g, "").slice(0, 4),
-                                  }))
-                                }
-                                inputMode="numeric"
-                                autoComplete="cc-csc"
-                              />
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {onlineChannel === "netbanking" && (
-                      <div className="pay-fields">
-                        <label>
-                          Choose bank
-                          <select
-                            className="checkout-input"
-                            value={bank}
-                            onChange={(event) => setBank(event.target.value)}
-                          >
-                            <option value="">Select your bank</option>
-                            {BANKS.map((name) => (
-                              <option key={name} value={name}>
-                                {name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <p className="pay-hint">
-                          You will be charged ₹{totalAmount.toLocaleString("en-IN")} through Mini Mart Pay.
-                        </p>
-                      </div>
+                    ) : paymentExpired ? (
+                      <p className="payment-qr-expired" role="status">
+                        This QR has expired. Generate a new one to try again.
+                      </p>
+                    ) : (
+                      <p className="pay-hint">
+                        A single-use QR for ₹{totalAmount.toLocaleString("en-IN")} will appear after you continue.
+                      </p>
                     )}
 
                     <div className="secure-note">
                       <FiShield />
-                      Card details stay in your browser. We only store a payment reference after success.
+                      The amount is fixed by the server and payment is confirmed by Razorpay.
                     </div>
                   </div>
                 )}
@@ -701,10 +533,10 @@ function Checkout() {
               <h4>Order summary</h4>
 
               <div className="checkout-items">
-                {cartItems.map((item) => (
+                {displayedItems.map((item) => (
                   <div
                     className="checkout-item"
-                    key={item._id || item.id || item.name}
+                    key={item._id || item.productId || item.id || item.name}
                   >
                     <div className="checkout-item-image">
                       <img
@@ -733,7 +565,7 @@ function Checkout() {
 
               <div className="summary-line">
                 <span>Subtotal</span>
-                <span>₹{totalAmount.toLocaleString("en-IN")}</span>
+                <span>₹{displayedTotalAmount.toLocaleString("en-IN")}</span>
               </div>
               <div className="summary-line">
                 <span>Delivery</span>
@@ -741,7 +573,7 @@ function Checkout() {
               </div>
               <div className="checkout-total">
                 <span>Total</span>
-                <strong>₹{totalAmount.toLocaleString("en-IN")}</strong>
+                <strong>₹{displayedTotalAmount.toLocaleString("en-IN")}</strong>
               </div>
 
               {error && (
@@ -753,11 +585,11 @@ function Checkout() {
               <button
                 type="submit"
                 className="place-order-button"
-                disabled={placingOrder}
+                disabled={placingOrder || Boolean(activePayment)}
               >
                 {placingOrder ? (
                   paymentMethod === "Online Payment"
-                    ? "Processing payment..."
+                      ? "Generating payment QR..."
                     : "Placing order..."
                 ) : (
                   <>
@@ -785,12 +617,12 @@ function Checkout() {
             <div className="pay-spinner" />
             <h3>
               {paymentMethod === "Online Payment"
-                ? "Confirming your payment"
+                ? "Generating secure QR"
                 : "Placing your order"}
             </h3>
             <p>
               {paymentMethod === "Online Payment"
-                ? "Hold on while Mini Mart Pay completes this transaction."
+                ? "Setting up a fixed-amount UPI payment."
                 : "Saving your grocery order."}
             </p>
           </div>

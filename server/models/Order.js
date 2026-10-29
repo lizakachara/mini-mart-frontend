@@ -88,6 +88,7 @@ const orderSchema = new mongoose.Schema(
         "Paid",
         "Failed",
         "Refunded",
+        "Expired",
       ],
       default: "Pending",
     },
@@ -100,6 +101,21 @@ const orderSchema = new mongoose.Schema(
     paymentChannel: {
       type: String,
       default: "",
+    },
+
+    paymentQrId: {
+      type: String,
+      default: "",
+    },
+
+    paymentQrImageUrl: {
+      type: String,
+      default: "",
+    },
+
+    paymentQrExpiresAt: {
+      type: Date,
+      default: null,
     },
 
     shippingAddress: {

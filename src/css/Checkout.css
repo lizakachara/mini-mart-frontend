@@ -196,6 +196,11 @@
   box-shadow: 0 0 0 3px rgba(233, 79, 112, 0.12);
 }
 
+.checkout-input:disabled {
+  background: #f3f5f7;
+  color: #67717c;
+}
+
 .payment-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -237,6 +242,11 @@
 
 .payment-tile.selected {
   background: #fff0f3;
+}
+
+.payment-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .online-pay-panel {
@@ -294,6 +304,65 @@
 
 .secure-note {
   margin-top: 14px;
+}
+
+.qr-payment-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.qr-payment-heading strong {
+  color: #171717;
+  font-size: 15px;
+}
+
+.qr-payment-heading span,
+.payment-qr-view > span {
+  color: #667589;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.payment-qr-view {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid #e6e9ed;
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+}
+
+.payment-qr-view img {
+  display: block;
+  width: min(100%, 240px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: #fff;
+}
+
+.payment-qr-view > strong {
+  color: #171717;
+  font-size: 24px;
+}
+
+.payment-qr-view p,
+.payment-qr-expired {
+  margin: 0;
+  color: #667589;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.payment-qr-expired {
+  border-radius: 9px;
+  padding: 12px;
+  background: #fff4e5;
+  color: #8a4b08;
 }
 
 .card-pay-layout {
