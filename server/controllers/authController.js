@@ -186,14 +186,7 @@ const requestPasswordReset = async (req, res) => {
       return res.status(400).json({ message: "Email address is required." });
     }
 
-    const frontendUrl = process.env.FRONTEND_URL;
     const mailTransport = createMailTransport();
-
-    if (!frontendUrl || !mailTransport) {
-      return res.status(503).json({
-        message: "Password reset email is not configured on the server.",
-      });
-    }
 
     const user = await User.findOne({ email });
 
@@ -203,28 +196,40 @@ const requestPasswordReset = async (req, res) => {
         .createHash("sha256")
         .update(resetToken)
         .digest("hex");
-      const resetUrl = new URL("/forgot-password", frontendUrl);
-
-      resetUrl.searchParams.set("token", resetToken);
 
       user.passwordResetToken = resetTokenHash;
       user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
       await user.save();
 
-      try {
-        await mailTransport.sendMail({
-          from: process.env.SMTP_FROM || process.env.SMTP_USER,
-          to: user.email,
-          subject: "Reset your Mini Mart password",
-          text: `Use this link within one hour to reset your password: ${resetUrl.toString()}`,
-          html: `<p>Use this link within one hour to reset your Mini Mart password:</p><p><a href="${resetUrl.toString()}">Reset password</a></p>`,
+      if (mailTransport && process.env.FRONTEND_URL) {
+        const resetUrl = new URL("/forgot-password", process.env.FRONTEND_URL);
+        resetUrl.searchParams.set("token", resetToken);
+
+        try {
+          await mailTransport.sendMail({
+            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+            to: user.email,
+            subject: "Reset your Mini Mart password",
+            text: `Use this link within one hour to reset your password: ${resetUrl.toString()}`,
+            html: `<p>Use this link within one hour to reset your Mini Mart password:</p><p><a href="${resetUrl.toString()}">Reset password</a></p>`,
+          });
+        } catch (mailError) {
+          user.passwordResetToken = "";
+          user.passwordResetExpires = null;
+          await user.save();
+          throw mailError;
+        }
+
+        return res.status(200).json({
+          message: "If an account exists for that email, a password reset link has been sent.",
         });
-      } catch (mailError) {
-        user.passwordResetToken = "";
-        user.passwordResetExpires = null;
-        await user.save();
-        throw mailError;
       }
+
+      res.status(200).json({
+        message: "Demo reset link is ready. Use it within one hour to set a new password.",
+        demoResetUrl: `/forgot-password?token=${encodeURIComponent(resetToken)}`,
+      });
+      return;
     }
 
     res.status(200).json({

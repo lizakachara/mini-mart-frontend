@@ -13,6 +13,7 @@ function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [demoResetUrl, setDemoResetUrl] = useState("");
   const [complete, setComplete] = useState(false);
 
   const handleSubmit = async (event) => {
@@ -48,6 +49,7 @@ function ForgotPassword() {
       }
 
       setMessage(data.message);
+      setDemoResetUrl(data.demoResetUrl || "");
       if (token) setComplete(true);
     } catch (requestError) {
       setError(requestError.message || "Unable to contact the server.");
@@ -109,6 +111,11 @@ function ForgotPassword() {
 
             {error && <p className="password-reset-error" role="alert">{error}</p>}
             {message && <p className="password-reset-message" role="status">{message}</p>}
+            {demoResetUrl && (
+              <Link className="password-reset-demo-link" to={demoResetUrl}>
+                Continue to reset password
+              </Link>
+            )}
 
             <button className="password-reset-submit" type="submit" disabled={loading}>
               {loading
