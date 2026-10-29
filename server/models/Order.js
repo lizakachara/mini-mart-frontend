@@ -103,16 +103,6 @@ const orderSchema = new mongoose.Schema(
       default: "",
     },
 
-    paymentQrId: {
-      type: String,
-      default: "",
-    },
-
-    paymentQrImageUrl: {
-      type: String,
-      default: "",
-    },
-
     paymentQrExpiresAt: {
       type: Date,
       default: null,

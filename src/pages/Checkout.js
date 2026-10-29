@@ -37,6 +37,7 @@ function Checkout() {
   const [serverOrder, setServerOrder] = useState(null);
   const [paymentSecondsLeft, setPaymentSecondsLeft] = useState(60);
   const [paymentExpired, setPaymentExpired] = useState(false);
+  const [completingDemoPayment, setCompletingDemoPayment] = useState(false);
   const authToken =
     token || sessionStorage.getItem("token") || localStorage.getItem("token");
 
@@ -213,6 +214,42 @@ function Checkout() {
     }
   };
 
+  const handleCompleteDemoPayment = async () => {
+    if (!activePayment || !authToken || completingDemoPayment) return;
+
+    setError("");
+    setCompletingDemoPayment(true);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/${activePayment.orderId}/payment/demo-complete`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${authToken}` },
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to complete demo payment.");
+      }
+
+      if (typeof clearCart === "function") clearCart();
+      setActivePayment(null);
+      navigate("/order-confirmation", {
+        state: {
+          order: data.order,
+          customerName: formData.fullName,
+          totalAmount: data.order.totalAmount,
+        },
+      });
+    } catch (demoError) {
+      setError(demoError.message || "Unable to complete demo payment.");
+    } finally {
+      setCompletingDemoPayment(false);
+    }
+  };
+
   useEffect(() => {
     if (!activePayment || !authToken) return undefined;
 
@@ -291,10 +328,10 @@ function Checkout() {
   const payLabel =
     paymentMethod === "Online Payment"
       ? activePayment
-        ? "Waiting for payment..."
+        ? "Demo payment pending..."
         : paymentExpired
-        ? `Generate new QR · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
-        : `Pay ₹${displayedTotalAmount.toLocaleString("en-IN")}`
+        ? `Generate new demo QR · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
+        : `Generate demo QR · ₹${displayedTotalAmount.toLocaleString("en-IN")}`
       : `Place Order · ₹${displayedTotalAmount.toLocaleString("en-IN")}`;
 
   return (
@@ -304,7 +341,7 @@ function Checkout() {
 
       <div className="checkout-shell">
         <div className="checkout-heading">
-          <p className="checkout-kicker">Secure grocery checkout</p>
+          <p className="checkout-kicker">Demo grocery checkout</p>
           <h1>Almost there</h1>
           <p>Confirm delivery details and pay in a few seconds.</p>
         </div>
@@ -445,7 +482,7 @@ function Checkout() {
                   <div>
                     <h4>Payment method</h4>
                     <p className="checkout-card-text">
-                      Pay on delivery or complete a secure online payment now.
+                      Choose cash on delivery or try the simulated online payment.
                     </p>
                   </div>
                 </div>
@@ -477,23 +514,23 @@ function Checkout() {
                     disabled={Boolean(activePayment)}
                   >
                     <FiLock />
-                    <strong>Pay online</strong>
-                    <span>UPI, card or net banking</span>
+                    <strong>Online payment demo</strong>
+                    <span>Demo QR · no real charge</span>
                   </button>
                 </div>
 
                 {paymentMethod === "Online Payment" && (
                   <div className="online-pay-panel">
                     <div className="qr-payment-heading">
-                      <strong>Pay by UPI QR</strong>
-                      <span>Fixed amount · expires in 1 minute</span>
+                      <strong>Demo UPI-style QR</strong>
+                      <span>Fixed amount · 1 minute</span>
                     </div>
 
                     {activePayment ? (
                       <div className="payment-qr-view">
                         <img
                           src={activePayment.imageUrl}
-                          alt={`UPI payment QR for ₹${activePayment.order.totalAmount}`}
+                          alt={`Demo payment QR for ₹${activePayment.order.totalAmount}`}
                         />
                         <strong>
                           ₹{Number(activePayment.order.totalAmount).toLocaleString("en-IN")}
@@ -503,7 +540,17 @@ function Checkout() {
                             ? `Scan within ${String(Math.floor(paymentSecondsLeft / 60)).padStart(2, "0")}:${String(paymentSecondsLeft % 60).padStart(2, "0")}`
                             : "Checking payment status..."}
                         </span>
-                        <p>Payment is verified securely. Keep this page open.</p>
+                        <p>Demo only. Scanning this code will not charge money.</p>
+                        <button
+                          className="demo-payment-complete-button"
+                          type="button"
+                          onClick={handleCompleteDemoPayment}
+                          disabled={completingDemoPayment || paymentSecondsLeft === 0}
+                        >
+                          {completingDemoPayment
+                            ? "Completing demo..."
+                            : "Complete demo payment"}
+                        </button>
                       </div>
                     ) : paymentExpired ? (
                       <p className="payment-qr-expired" role="status">
@@ -511,13 +558,13 @@ function Checkout() {
                       </p>
                     ) : (
                       <p className="pay-hint">
-                        A single-use QR for ₹{totalAmount.toLocaleString("en-IN")} will appear after you continue.
+                        A demo QR for ₹{displayedTotalAmount.toLocaleString("en-IN")} will appear. It does not collect money.
                       </p>
                     )}
 
                     <div className="secure-note">
                       <FiShield />
-                      The amount is fixed by the server and payment is confirmed by Razorpay.
+                      The amount is fixed by the server. This is a demo only; no real payment is made.
                     </div>
                   </div>
                 )}
@@ -600,7 +647,7 @@ function Checkout() {
               </button>
 
               <p className="trust-row">
-                <FiLock /> Encrypted checkout · Free same-day delivery slot
+                <FiLock /> Demo payments are simulated · Free same-day delivery slot
               </p>
 
               <Link to="/cart" className="back-cart-link">
@@ -617,7 +664,7 @@ function Checkout() {
             <div className="pay-spinner" />
             <h3>
               {paymentMethod === "Online Payment"
-                ? "Generating secure QR"
+                ? "Generating demo QR"
                 : "Placing your order"}
             </h3>
             <p>

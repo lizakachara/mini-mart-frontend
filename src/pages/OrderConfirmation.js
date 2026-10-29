@@ -14,6 +14,7 @@ function OrderConfirmation() {
 
   const paymentStatus = order?.paymentStatus || "Pending";
   const paymentMethod = order?.paymentMethod || "Payment";
+  const isDemoPayment = paymentMethod === "Demo Online Payment";
   const orderStatus = order?.orderStatus || "Pending";
 
   return (
@@ -23,14 +24,18 @@ function OrderConfirmation() {
           <div className="confirmation-icon">✓</div>
 
           <h1>
-            {paymentStatus === "Paid"
+            {isDemoPayment
+              ? "Demo payment complete"
+              : paymentStatus === "Paid"
               ? "Payment successful"
               : "Order placed successfully"}
           </h1>
 
           <p className="confirmation-message">
             {customerName ? `Thanks, ${customerName}. ` : "Thank you for shopping with Mini Mart. "}
-            {paymentStatus === "Paid"
+            {isDemoPayment
+              ? "This was a simulated payment. No real money was charged."
+              : paymentStatus === "Paid"
               ? "Your online payment has been received and the order is confirmed."
               : "Your order has been received and will be prepared for delivery."}
           </p>

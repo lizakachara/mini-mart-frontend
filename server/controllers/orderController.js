@@ -1,12 +1,8 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
-const {
-  QR_TTL_MS,
-  closeQrCodeSafely,
-  createQrCode,
-  isConfigured,
-  scheduleQrCodeClose,
-} = require("../services/razorpayService");
+const QRCode = require("qrcode");
+
+const DEMO_QR_TTL_MS = 60 * 1000;
 
 // GET ALL ORDERS (ADMIN)
 const getOrders = async (req, res) => {
@@ -90,12 +86,6 @@ const createOrder = async (req, res) => {
       });
     }
 
-    if (paymentMethod === "Online Payment" && !isConfigured()) {
-      return res.status(503).json({
-        message: "Online payments are not configured on the server.",
-      });
-    }
-
     const requestedQuantities = new Map();
     for (const item of items) {
       const productId = String(item.productId || "");
@@ -160,7 +150,10 @@ const createOrder = async (req, res) => {
       userId: req.user.id,
       items: orderItems,
       totalAmount: amountPaise / 100,
-      paymentMethod,
+      paymentMethod:
+        paymentMethod === "Online Payment"
+          ? "Demo Online Payment"
+          : paymentMethod,
       paymentStatus: "Pending",
       orderStatus: "Pending",
       shippingAddress: String(shippingAddress).trim(),
@@ -168,31 +161,32 @@ const createOrder = async (req, res) => {
     });
 
     if (paymentMethod === "Online Payment") {
-      let qrCode;
-
       try {
-        qrCode = await createQrCode({ orderId: order._id, amountPaise });
+        const paymentExpiresAt = new Date(Date.now() + DEMO_QR_TTL_MS);
+        const qrPayload = JSON.stringify({
+          type: "MINI_MART_DEMO_PAYMENT",
+          orderId: String(order._id),
+          amountPaise,
+          expiresAt: paymentExpiresAt.toISOString(),
+        });
+        const imageUrl = await QRCode.toDataURL(qrPayload, {
+          errorCorrectionLevel: "M",
+          margin: 1,
+          width: 280,
+        });
 
-        if (!qrCode.id || !qrCode.image_url) {
-          throw new Error("The payment provider returned an invalid QR code.");
-        }
-
-        order.paymentQrId = qrCode.id;
-        order.paymentQrImageUrl = qrCode.image_url;
-        order.paymentQrExpiresAt = new Date(Date.now() + QR_TTL_MS);
+        order.paymentQrExpiresAt = paymentExpiresAt;
         await order.save();
-        scheduleQrCodeClose(qrCode.id);
 
         return res.status(201).json({
-          message: "Scan the QR code to complete payment.",
+          message: "Demo QR generated. No real payment will be taken.",
           order,
           paymentQr: {
-            imageUrl: qrCode.image_url,
+            imageUrl,
             expiresAt: order.paymentQrExpiresAt,
           },
         });
       } catch (error) {
-        if (qrCode?.id) await closeQrCodeSafely(qrCode.id);
         await Order.findByIdAndDelete(order._id);
         throw error;
       }
@@ -218,7 +212,7 @@ const updateOrderStatus = async (req, res) => {
 
     if (req.body.paymentStatus !== undefined) {
       return res.status(400).json({
-        message: "Payment status is managed by the payment provider.",
+        message: "Payment status is managed by the checkout flow.",
       });
     }
 
