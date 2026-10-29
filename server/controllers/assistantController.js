@@ -1,9 +1,13 @@
 
 const Product = require("../models/Product");
+const Order = require("../models/Order");
+const User = require("../models/User");
+const AssistantConversation = require("../models/AssistantConversation");
 
 const MAX_MESSAGE_LENGTH = 400;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT = 12;
+const HISTORY_LIMIT = 80;
 
 const requestLog = new Map();
 
@@ -23,6 +27,163 @@ function isRateLimited(key) {
   requestLog.set(key, stamps);
   return false;
 }
+
+async function saveConversation(userId, customerText, assistantReply) {
+  await AssistantConversation.updateOne(
+    { userId },
+    {
+      $push: {
+        messages: {
+          $each: [
+            { role: "customer", text: customerText },
+            {
+              role: "assistant",
+              text: assistantReply.text,
+              products: assistantReply.products || [],
+              orders: assistantReply.orders || [],
+            },
+          ],
+          $slice: -HISTORY_LIMIT,
+        },
+      },
+    },
+    { upsert: true }
+  );
+}
+
+function toPrivateOrderSummary(order) {
+  const id = order._id.toString();
+  return {
+    id,
+    orderNumber: `MM${id.slice(-6).toUpperCase()}`,
+    date: order.orderDate || order.createdAt,
+    totalAmount: Number(order.totalAmount) || 0,
+    orderStatus: order.orderStatus || "Pending",
+    paymentStatus: order.paymentStatus || "Pending",
+    paymentMethod: order.paymentMethod || "Not specified",
+    items: (order.items || []).map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+    })),
+  };
+}
+
+async function answerAccountQuestion(userId, message) {
+  const text = message.toLowerCase();
+  const asksOrders =
+    /\bmy\s+(?:orders?|purchases?)\b|\border history\b|\bpurchase history\b|\bhow many\b.*\borders?\b|\btrack\s+(?:my\s+)?order\b|\border status\b|\blast order\b|\bwhat did i order\b|\bwhere(?:'s| is)\s+(?:my\s+)?order\b/i.test(text);
+
+  if (asksOrders) {
+    const orderIdMatch = text.match(/\b[a-f\d]{24}\b/i);
+
+    if (orderIdMatch) {
+      const selected = await Order.findOne({
+        _id: orderIdMatch[0],
+        userId,
+      }).lean();
+      if (!selected) {
+        return { text: "I couldn't find that order in your account.", orders: [] };
+      }
+      return {
+        text: `Order ${toPrivateOrderSummary(selected).orderNumber} is ${selected.orderStatus || "Pending"}. Payment status: ${selected.paymentStatus || "Pending"}.`,
+        orders: [toPrivateOrderSummary(selected)],
+      };
+    }
+
+    if (/\bhow many\b/i.test(text)) {
+      const orderCount = await Order.countDocuments({ userId });
+      return {
+        text: `You have ${orderCount} order${orderCount === 1 ? "" : "s"} on your account.`,
+        orders: [],
+      };
+    }
+
+    if (/\blast order\b|\border status\b|\btrack\b|\bwhere(?:'s| is)\s+(?:my\s+)?order\b|\bwhat did i order\b/i.test(text) && !/history|all my orders/i.test(text)) {
+      const latestOrder = await Order.findOne({ userId }).sort({ createdAt: -1 }).lean();
+      if (!latestOrder) {
+        return { text: "I don't see any orders on your account yet.", orders: [] };
+      }
+      const latest = toPrivateOrderSummary(latestOrder);
+      if (/\bwhere(?:'s| is)\s+(?:my\s+)?order\b/i.test(text)) {
+        return {
+          text: latestOrder.shippingAddress
+            ? `Your latest order ${latest.orderNumber} is being delivered to ${latestOrder.shippingAddress}.`
+            : "There is no delivery address saved on your latest order.",
+          orders: [latest],
+        };
+      }
+      if (/\bwhat did i order\b/i.test(text)) {
+        const items = latest.items.map((item) => `${item.quantity} × ${item.name}`).join(", ");
+        return {
+          text: `Your latest order ${latest.orderNumber} contains ${items || "no item details"}.`,
+          orders: [latest],
+        };
+      }
+      return {
+        text: `Your latest order ${latest.orderNumber} is ${latest.orderStatus}. Payment status: ${latest.paymentStatus}.`,
+        orders: [latest],
+      };
+    }
+
+    const [orderCount, orders] = await Promise.all([
+      Order.countDocuments({ userId }),
+      Order.find({ userId }).sort({ createdAt: -1 }).limit(8).lean(),
+    ]);
+
+    if (!orderCount) {
+      return { text: "I don't see any orders on your account yet.", orders: [] };
+    }
+
+    const summaries = orders.map(toPrivateOrderSummary);
+    return {
+      text: `You have ${orderCount} order${orderCount === 1 ? "" : "s"}. Here is your recent order history${orderCount > summaries.length ? " (latest 8)" : ""}.`,
+      orders: summaries,
+    };
+  }
+
+  if (/\b(my|mine|account|profile|registered email|phone number)\b/i.test(text)) {
+    const user = await User.findById(userId).select("name email phone address").lean();
+
+    if (!user) {
+      return { text: "I couldn't load your account details. Please sign in again.", orders: [] };
+    }
+
+    if (/\b(email|email address)\b/i.test(text)) {
+      return { text: `The email on your account is ${user.email}.`, orders: [] };
+    }
+    if (/\b(phone|mobile|telephone)\b/i.test(text)) {
+      return { text: user.phone ? `The phone number on your account is ${user.phone}.` : "There is no phone number saved on your account.", orders: [] };
+    }
+    if (/\b(address|delivery address)\b/i.test(text)) {
+      return { text: user.address ? `The address saved on your account is ${user.address}.` : "There is no address saved on your account.", orders: [] };
+    }
+    if (/\b(name|profile|account details)\b/i.test(text)) {
+      return { text: `Your account name is ${user.name}. Email: ${user.email}.`, orders: [] };
+    }
+  }
+
+  return null;
+}
+
+const getAssistantHistory = async (req, res) => {
+  try {
+    const conversation = await AssistantConversation.findOne({ userId: req.user.id }).lean();
+    res.status(200).json({ messages: conversation?.messages || [] });
+  } catch (error) {
+    console.error("Get Assistant History Error:", error.message);
+    res.status(500).json({ message: "Unable to load your chat history." });
+  }
+};
+
+const clearAssistantHistory = async (req, res) => {
+  try {
+    await AssistantConversation.deleteOne({ userId: req.user.id });
+    res.status(200).json({ message: "Your chat history was cleared." });
+  } catch (error) {
+    console.error("Clear Assistant History Error:", error.message);
+    res.status(500).json({ message: "Unable to clear your chat history." });
+  }
+};
 
 function extractBudget(message) {
   const patterns = [
@@ -275,6 +436,19 @@ const chatWithAssistant = async (req, res) => {
       });
     }
 
+    const accountReply = await answerAccountQuestion(req.user.id, message);
+
+    if (accountReply) {
+      await saveConversation(req.user.id, message, accountReply);
+      return res.status(200).json({
+        configured: true,
+        mode: "account",
+        reply: accountReply.text,
+        products: [],
+        orders: accountReply.orders || [],
+      });
+    }
+
     const dbProducts = await Product.find({
       isActive: { $ne: false },
     })
@@ -296,11 +470,18 @@ const chatWithAssistant = async (req, res) => {
       result.intent
     );
 
+    await saveConversation(req.user.id, message, {
+      text: reply,
+      products,
+      orders: [],
+    });
+
     return res.status(200).json({
       configured: true,
       mode: "catalog",
       reply,
       products,
+      orders: [],
     });
   } catch (error) {
     console.error("Assistant Chat Error:", error.message);
@@ -312,6 +493,8 @@ const chatWithAssistant = async (req, res) => {
 };
 
 module.exports = {
+  clearAssistantHistory,
+  getAssistantHistory,
   getAssistantStatus,
   chatWithAssistant,
 };
