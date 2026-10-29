@@ -7,6 +7,7 @@ FaEdit,
 FaTimes,
 FaSave,
 FaBoxOpen,
+FaTrash,
 } from "react-icons/fa";
 
 import "../css/AdminOrders.css";
@@ -260,6 +261,52 @@ try {
 
 };
 
+const deleteOrder = async (order) => {
+  const orderId = getOrderId(order);
+
+  if (!orderId || orderId === "N/A") {
+    alert("This order does not have a valid ID.");
+    return;
+  }
+
+  if (!window.confirm(`Permanently delete order #${String(orderId).slice(-8)}?`)) {
+    return;
+  }
+
+  try {
+    setSaving(true);
+    setError("");
+
+    const token = getToken();
+
+    if (!token) {
+      throw new Error("Admin login required. Please log in again.");
+    }
+
+    const response = await fetch(`${API_URL}/${orderId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = response.headers.get("content-type")?.includes("application/json")
+      ? await response.json()
+      : { message: "Order deletion is not enabled on the server yet. Deploy the latest backend, then try again." };
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to delete order.");
+    }
+
+    setOrders((previous) =>
+      previous.filter((item) => String(getOrderId(item)) !== String(orderId))
+    );
+    alert(data.message || "Order deleted successfully.");
+  } catch (err) {
+    console.error("Delete order error:", err);
+    alert(err.message || "Unable to delete order.");
+  } finally {
+    setSaving(false);
+  }
+};
+
 return ( <div className="admin-orders-page">
 {/* HEADER */} <section className="admin-orders-header"> <div className="admin-orders-container"> <div> <p className="admin-orders-label">Store Management</p> <h1>Manage Orders</h1> <p className="admin-orders-description">
 View, track and manage customer orders. </p> </div>
@@ -428,6 +475,17 @@ View, track and manage customer orders. </p> </div>
                         onClick={() => openEditStatus(order)}
                       >
                         <FaEdit />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="delete-order-button"
+                        title="Delete Order"
+                        aria-label={`Delete order ${String(getOrderId(order)).slice(-8)}`}
+                        onClick={() => deleteOrder(order)}
+                        disabled={saving}
+                      >
+                        <FaTrash />
                       </button>
                     </div>
                   </td>

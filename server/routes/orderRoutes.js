@@ -6,6 +6,7 @@ const {
   getOrderById,
   createOrder,
   updateOrderStatus,
+  deleteOrder,
 } = require("../controllers/orderController");
 
 const {
@@ -29,5 +30,8 @@ router.post("/", protect, createOrder);
 
 // ADMIN ONLY: Update order and payment status
 router.patch("/:id/status", protect, adminOnly, updateOrderStatus);
+
+// ADMIN ONLY: Delete an order
+router.delete("/:id", protect, adminOnly, deleteOrder);
 
 module.exports = router;

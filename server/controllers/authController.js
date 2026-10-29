@@ -1,7 +1,33 @@
 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 const User = require("../models/User");
+
+const createMailTransport = () => {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+    return null;
+  }
+
+  const port = Number(SMTP_PORT);
+
+  if (!Number.isInteger(port) || port <= 0) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port,
+    secure: port === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
+};
 
 // Generate JWT Token
 const generateToken = (user) => {
@@ -151,6 +177,117 @@ const loginUser = async (req, res) => {
   }
 };
 
+// REQUEST PASSWORD RESET
+const requestPasswordReset = async (req, res) => {
+  try {
+    const email = String(req.body.email || "").trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ message: "Email address is required." });
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL;
+    const mailTransport = createMailTransport();
+
+    if (!frontendUrl || !mailTransport) {
+      return res.status(503).json({
+        message: "Password reset email is not configured on the server.",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenHash = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+      const resetUrl = new URL("/forgot-password", frontendUrl);
+
+      resetUrl.searchParams.set("token", resetToken);
+
+      user.passwordResetToken = resetTokenHash;
+      user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+      await user.save();
+
+      try {
+        await mailTransport.sendMail({
+          from: process.env.SMTP_FROM || process.env.SMTP_USER,
+          to: user.email,
+          subject: "Reset your Mini Mart password",
+          text: `Use this link within one hour to reset your password: ${resetUrl.toString()}`,
+          html: `<p>Use this link within one hour to reset your Mini Mart password:</p><p><a href="${resetUrl.toString()}">Reset password</a></p>`,
+        });
+      } catch (mailError) {
+        user.passwordResetToken = "";
+        user.passwordResetExpires = null;
+        await user.save();
+        throw mailError;
+      }
+    }
+
+    res.status(200).json({
+      message: "If an account exists for that email, a password reset link has been sent.",
+    });
+  } catch (error) {
+    console.error("Request Password Reset Error:", error.message);
+
+    res.status(500).json({
+      message: "Unable to send a password reset email. Please try again later.",
+    });
+  }
+};
+
+// RESET PASSWORD WITH A SINGLE-USE TOKEN
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (typeof token !== "string" || !token || typeof password !== "string") {
+      return res.status(400).json({
+        message: "A reset token and new password are required.",
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters long.",
+      });
+    }
+
+    const resetTokenHash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+    const user = await User.findOne({
+      passwordResetToken: resetTokenHash,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "This password reset link is invalid or has expired.",
+      });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    user.passwordResetToken = "";
+    user.passwordResetExpires = null;
+    await user.save();
+
+    res.status(200).json({
+      message: "Password reset successfully. You can now sign in.",
+    });
+  } catch (error) {
+    console.error("Reset Password Error:", error.message);
+
+    res.status(500).json({
+      message: "Unable to reset your password. Please try again.",
+    });
+  }
+};
+
 // ===============================
 // GET CUSTOMER PROFILE
 // ===============================
@@ -257,6 +394,8 @@ const updateProfile = async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
+  requestPasswordReset,
+  resetPassword,
   getProfile,
   updateProfile,
 };

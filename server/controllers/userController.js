@@ -77,8 +77,42 @@ const updateUserStatus = async (req, res) => {
   }
 };
 
+// DELETE CUSTOMER ACCOUNT (ADMIN)
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found.",
+      });
+    }
+
+    if (user.role === "admin" || user._id.toString() === req.user.id) {
+      return res.status(403).json({
+        message: "Admin accounts cannot be deleted here.",
+      });
+    }
+
+    await User.findByIdAndDelete(user._id);
+
+    res.status(200).json({
+      message: "User deleted successfully. Existing orders have been retained.",
+    });
+  } catch (error) {
+    console.error("Delete User Error:", error.message);
+
+    res.status(error.name === "CastError" ? 400 : 500).json({
+      message: error.name === "CastError"
+        ? "Invalid user ID."
+        : "Failed to delete user.",
+    });
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
   updateUserStatus,
+  deleteUser,
 };

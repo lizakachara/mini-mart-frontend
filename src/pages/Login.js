@@ -204,11 +204,7 @@ function Login() {
                   <button
                     type="button"
                     className="forgot-button"
-                    onClick={() =>
-                      alert(
-                        "Password reset will be added later."
-                      )
-                    }
+                    onClick={() => navigate("/forgot-password")}
                   >
                     Forgot Password?
                   </button>

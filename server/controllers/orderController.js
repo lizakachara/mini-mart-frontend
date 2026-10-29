@@ -60,7 +60,7 @@ const getOrderById = async (req, res) => {
     // Customers may only access their own orders.
     if (
       req.user.role !== "admin" &&
-      order.userId._id.toString() !== req.user.id
+      (!order.userId || order.userId._id.toString() !== req.user.id)
     ) {
       return res.status(403).json({
         message: "You are not allowed to view this order.",
@@ -256,10 +256,36 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+// DELETE ORDER (ADMIN)
+const deleteOrder = async (req, res) => {
+  try {
+    const order = await Order.findByIdAndDelete(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        message: "Order not found.",
+      });
+    }
+
+    res.status(200).json({
+      message: "Order deleted successfully.",
+    });
+  } catch (error) {
+    console.error("Delete Order Error:", error.message);
+
+    res.status(error.name === "CastError" ? 400 : 500).json({
+      message: error.name === "CastError"
+        ? "Invalid order ID."
+        : "Failed to delete order.",
+    });
+  }
+};
+
 module.exports = {
   getOrders,
   getMyOrders,
   getOrderById,
   createOrder,
   updateOrderStatus,
+  deleteOrder,
 };

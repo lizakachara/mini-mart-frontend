@@ -7,6 +7,7 @@ FaEye,
 FaEdit,
 FaTimes,
 FaSave,
+FaTrash,
 } from "react-icons/fa";
 
 import "../css/AdminUsers.css";
@@ -251,6 +252,57 @@ try {
 
 };
 
+const deleteUser = async (user) => {
+  if (user.role === "admin") return;
+
+  const orderCount = getOrderCount(user);
+  const orderNote = orderCount
+    ? ` ${orderCount} existing order${orderCount === 1 ? " will" : "s will"} be retained.`
+    : "";
+
+  if (!window.confirm(`Delete customer account "${user.name}"?${orderNote}`)) {
+    return;
+  }
+
+  try {
+    setSaving(true);
+
+    const token = getToken();
+
+    if (!token) {
+      throw new Error("Admin login required. Please log in again.");
+    }
+
+    const response = await fetch(`${USERS_API}/${user._id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = response.headers.get("content-type")?.includes("application/json")
+      ? await response.json()
+      : { message: "User deletion is not enabled on the server yet. Deploy the latest backend, then try again." };
+
+    if (!response.ok) {
+      throw new Error(data.message || "Unable to delete user.");
+    }
+
+    setUsers((previous) =>
+      previous.filter((item) => String(item._id) !== String(user._id))
+    );
+    setSelectedUser((previous) =>
+      previous?._id === user._id ? null : previous
+    );
+    setEditingUser((previous) =>
+      previous?._id === user._id ? null : previous
+    );
+    alert(data.message || "User deleted successfully.");
+  } catch (err) {
+    console.error("Delete user error:", err);
+    alert(err.message || "Unable to delete user.");
+  } finally {
+    setSaving(false);
+  }
+};
+
 // STATUS CSS CLASS
 const getStatusClass = (status) => {
 return status === "Active"
@@ -435,6 +487,17 @@ Store Management </p>
                           onClick={() => openEditUser(user)}
                         >
                           <FaEdit />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="delete-user-button"
+                          title={user.role === "admin" ? "Admin accounts cannot be deleted" : "Delete User"}
+                          aria-label={`Delete user ${user.name}`}
+                          onClick={() => deleteUser(user)}
+                          disabled={saving || user.role === "admin"}
+                        >
+                          <FaTrash />
                         </button>
                       </div>
                     </td>

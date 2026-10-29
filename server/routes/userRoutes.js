@@ -4,6 +4,7 @@ const {
   getUsers,
   getUserById,
   updateUserStatus,
+  deleteUser,
 } = require("../controllers/userController");
 
 const {
@@ -21,5 +22,8 @@ router.get("/:id", protect, adminOnly, getUserById);
 
 // ADMIN ONLY: Update user status
 router.patch("/:id/status", protect, adminOnly, updateUserStatus);
+
+// ADMIN ONLY: Delete a customer account
+router.delete("/:id", protect, adminOnly, deleteUser);
 
 module.exports = router;
